@@ -22,7 +22,7 @@ const VelocitySOL = () => {
   const [tradingMode, setTradingMode] = useState('paper');
   
   // Backend Configuration - REPLACE WITH YOUR VERCEL URL
-  const API_BASE = 'https://your-vercel-url.vercel.app/api';
+  const API_BASE = 'https://velocity-sol-backend.vercel.app/api';
   
   // Wallet Integration
   const connectWallet = useCallback(async () => {
