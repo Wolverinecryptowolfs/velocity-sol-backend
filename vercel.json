@@ -1,17 +1,33 @@
 {
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    }
+  ],
   "functions": {
     "api/*.js": {
       "maxDuration": 10
     }
   },
-  "headers": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
-      ]
-    }
+      "src": "/static/(.*)",
+      "headers": { "cache-control": "s-maxage=31536000" },
+      "dest": "/static/$1"
+    },
+    { 
+      "src": "/api/(.*)", 
+      "dest": "/api/$1",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      }
+    },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
