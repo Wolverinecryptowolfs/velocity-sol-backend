@@ -453,7 +453,7 @@ const VelocitySOL = () => {
             
             <div className="mb-6">
               <div className="text-3xl font-bold text-white mb-2">
-                {showBalance ? ' + realBalance.usd.toFixed(2) : '••••••'}
+                {showBalance ? '$' + realBalance.usd.toFixed(2) : '••••••'}
               </div>
               <div className="text-green-400 text-sm">
                 {realBalance.sol.toFixed(4)} SOL
