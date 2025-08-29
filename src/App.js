@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Wallet, TrendingUp, Bot, Zap, Eye, EyeOff, Copy, RefreshCw, 
-  AlertCircle, CheckCircle, Target, Shield, Activity, TrendingDown 
+  AlertCircle, CheckCircle, Target, Shield, Activity, TrendingDown,
+  Send, Download, X
 } from 'lucide-react';
 
 const VelocitySOL = () => {
@@ -20,6 +21,12 @@ const VelocitySOL = () => {
   const [realBalance, setRealBalance] = useState({ sol: 0, usd: 0 });
   const [positionSize, setPositionSize] = useState('1000');
   const [tradingMode, setTradingMode] = useState('paper');
+  
+  // Send/Receive Modal State
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [sendAmount, setSendAmount] = useState('');
+  const [sendAddress, setSendAddress] = useState('');
   
   // Backend Configuration - REPLACE WITH YOUR VERCEL URL
   const API_BASE = 'https://velocity-sol-backend.vercel.app/api';
@@ -55,6 +62,22 @@ const VelocitySOL = () => {
       alert('Connection failed: ' + error.message);
     }
   }, [currentPrice]);
+  
+  // Disconnect Wallet
+  const disconnectWallet = async () => {
+    try {
+      if (window.solana) {
+        await window.solana.disconnect();
+      }
+      setIsConnected(false);
+      setWalletInfo(null);
+      setRealBalance({ sol: 0, usd: 0 });
+      setPositions([]);
+      setConnectionStatus('disconnected');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
   
   // Live Data Fetching
   const fetchLiveData = useCallback(async () => {
@@ -130,6 +153,109 @@ const VelocitySOL = () => {
     
     // For live trading - would implement Jupiter swap execution here
     alert(`Live trading not yet implemented. Use paper trading mode.`);
+  };
+  
+  // Send Modal Component
+  const SendModal = () => {
+    if (!showSendModal) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-gray-800 rounded-2xl p-6 max-w-md w-full mx-4 border border-gray-700">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-white">Send SOL</h3>
+            <button onClick={() => setShowSendModal(false)} className="text-gray-400 hover:text-white">
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-gray-400 text-sm mb-2">Recipient Address</label>
+              <input
+                type="text"
+                value={sendAddress}
+                onChange={(e) => setSendAddress(e.target.value)}
+                className="w-full bg-gray-700 text-white p-3 rounded border border-gray-600"
+                placeholder="Enter Solana address..."
+              />
+            </div>
+            
+            <div>
+              <label className="block text-gray-400 text-sm mb-2">Amount (SOL)</label>
+              <input
+                type="number"
+                value={sendAmount}
+                onChange={(e) => setSendAmount(e.target.value)}
+                className="w-full bg-gray-700 text-white p-3 rounded border border-gray-600"
+                placeholder="0.00"
+                step="0.01"
+              />
+              <div className="text-xs text-gray-400 mt-1">
+                Available: {realBalance.sol.toFixed(4)} SOL
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSendModal(false)}
+                className="flex-1 py-2 px-4 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  alert('Send functionality would be implemented here with real Solana transaction');
+                  setShowSendModal(false);
+                }}
+                className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Receive Modal Component
+  const ReceiveModal = () => {
+    if (!showReceiveModal) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-gray-800 rounded-2xl p-6 max-w-md w-full mx-4 border border-gray-700">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-white">Receive SOL</h3>
+            <button onClick={() => setShowReceiveModal(false)} className="text-gray-400 hover:text-white">
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="text-center space-y-4">
+            <div className="bg-white p-4 rounded-lg">
+              <div className="w-48 h-48 bg-gray-200 rounded flex items-center justify-center mx-auto">
+                <span className="text-gray-600">QR Code</span>
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-gray-400 text-sm mb-2">Your Wallet Address</label>
+              <div className="bg-gray-700 p-3 rounded border border-gray-600 break-all text-sm text-white">
+                {walletInfo?.address}
+              </div>
+              <button
+                onClick={() => navigator.clipboard.writeText(walletInfo?.address)}
+                className="mt-2 text-blue-400 hover:text-blue-300 text-sm"
+              >
+                Copy Address
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
   
   // Component Rendering
@@ -391,7 +517,7 @@ const VelocitySOL = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/10 to-blue-900/10">
-      {/* Header */}
+      {/* Header - Updated with Logout */}
       <div className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -408,6 +534,7 @@ const VelocitySOL = () => {
             </div>
             
             <div className="flex items-center gap-4">
+              {/* Price Display */}
               <div className="text-right">
                 <div className="text-white font-medium">${currentPrice.toFixed(2)}</div>
                 <div className={`text-xs ${priceChange24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -415,6 +542,7 @@ const VelocitySOL = () => {
                 </div>
               </div>
               
+              {/* Wallet Info */}
               {walletInfo && (
                 <div className="flex items-center gap-2 px-3 py-2 bg-gray-700/50 rounded-lg">
                   <Wallet className="text-blue-400" size={16} />
@@ -427,12 +555,23 @@ const VelocitySOL = () => {
                 </div>
               )}
               
+              {/* Refresh Button */}
               <button
                 onClick={fetchLiveData}
                 disabled={isLoading}
                 className="p-2 bg-gray-700/50 text-gray-400 hover:text-white rounded-lg transition-colors"
+                title="Refresh Data"
               >
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
+
+              {/* Logout Button */}
+              <button
+                onClick={disconnectWallet}
+                className="px-3 py-2 bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded-lg transition-colors text-sm"
+                title="Disconnect Wallet"
+              >
+                Logout
               </button>
             </div>
           </div>
@@ -442,7 +581,7 @@ const VelocitySOL = () => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Portfolio Summary */}
+          {/* Portfolio Summary - Updated with Send/Receive */}
           <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-white">Portfolio</h2>
@@ -458,6 +597,24 @@ const VelocitySOL = () => {
               <div className="text-green-400 text-sm">
                 {realBalance.sol.toFixed(4)} SOL
               </div>
+            </div>
+            
+            {/* Send/Receive Buttons */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <button
+                onClick={() => setShowSendModal(true)}
+                className="flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Send size={16} />
+                Send
+              </button>
+              <button
+                onClick={() => setShowReceiveModal(true)}
+                className="flex items-center justify-center gap-2 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <Download size={16} />
+                Receive
+              </button>
             </div>
             
             <div className="space-y-3">
@@ -502,6 +659,10 @@ const VelocitySOL = () => {
           </div>
         </div>
       </div>
+      
+      {/* Modals */}
+      <SendModal />
+      <ReceiveModal />
     </div>
   );
 };
