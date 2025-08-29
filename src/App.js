@@ -16,6 +16,7 @@ const VelocitySOL = () => {
   const [tradingSignal, setTradingSignal] = useState(null);
   const [historicalData, setHistoricalData] = useState(null);
   const [positions, setPositions] = useState([]);
+  const [tradingHistory, setTradingHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [realBalance, setRealBalance] = useState({ sol: 0, usd: 0 });
@@ -64,10 +65,14 @@ const VelocitySOL = () => {
         setRealBalance({ sol: 0, usd: 0 });
       }
       
-      // Load saved positions from localStorage
+      // Load saved positions and history from localStorage
       const savedPositions = localStorage.getItem('velocitySOL_positions');
+      const savedHistory = localStorage.getItem('velocitySOL_history');
       if (savedPositions) {
         setPositions(JSON.parse(savedPositions));
+      }
+      if (savedHistory) {
+        setTradingHistory(JSON.parse(savedHistory));
       }
       
       setConnectionStatus('connected');
@@ -134,15 +139,24 @@ const VelocitySOL = () => {
     return () => clearInterval(interval);
   }, [fetchLiveData]);
   
-  // Load positions on app start
+  // Load positions and history on app start
   useEffect(() => {
     const savedPositions = localStorage.getItem('velocitySOL_positions');
+    const savedHistory = localStorage.getItem('velocitySOL_history');
     if (savedPositions) {
       try {
         const parsedPositions = JSON.parse(savedPositions);
         setPositions(parsedPositions);
       } catch (error) {
         console.error('Error loading positions:', error);
+      }
+    }
+    if (savedHistory) {
+      try {
+        const parsedHistory = JSON.parse(savedHistory);
+        setTradingHistory(parsedHistory);
+      } catch (error) {
+        console.error('Error loading history:', error);
       }
     }
   }, []);
@@ -188,11 +202,75 @@ const VelocitySOL = () => {
     alert(`Live trading not yet implemented. Use paper trading mode.`);
   };
   
-  // Close Position Function
-  const closePosition = (positionId) => {
-    const updatedPositions = positions.filter(pos => pos.id !== positionId);
-    setPositions(updatedPositions);
-    localStorage.setItem('velocitySOL_positions', JSON.stringify(updatedPositions));
+  // Close Position Function - Updated with partial close and history
+  const closePosition = (positionId, partial = false) => {
+    const position = positions.find(pos => pos.id === positionId);
+    if (!position) return;
+    
+    const currentPnL = (currentPrice - position.entry) * position.size * (position.type.includes('BUY') ? 1 : -1);
+    const pnlPercent = ((currentPrice - position.entry) / position.entry * 100) * (position.type.includes('BUY') ? 1 : -1);
+    
+    if (partial) {
+      // Take Profit - Close 50% of position
+      const newSize = position.size * 0.5;
+      const partialPnL = currentPnL * 0.5;
+      
+      // Update position with smaller size
+      const updatedPositions = positions.map(pos => 
+        pos.id === positionId 
+          ? { ...pos, size: newSize }
+          : pos
+      );
+      setPositions(updatedPositions);
+      localStorage.setItem('velocitySOL_positions', JSON.stringify(updatedPositions));
+      
+      // Add to history
+      const historyEntry = {
+        id: Date.now(),
+        type: 'PARTIAL_CLOSE',
+        symbol: 'SOL',
+        action: position.type,
+        entry: position.entry,
+        exit: currentPrice,
+        size: position.size * 0.5,
+        pnl: partialPnL,
+        pnlPercent: pnlPercent,
+        timestamp: new Date(),
+        status: 'CLOSED'
+      };
+      
+      const updatedHistory = [...tradingHistory, historyEntry];
+      setTradingHistory(updatedHistory);
+      localStorage.setItem('velocitySOL_history', JSON.stringify(updatedHistory));
+      
+      alert(`Partial close: 50% of position closed with ${partialPnL >= 0 ? 'profit' : 'loss'}: ${partialPnL.toFixed(2)}`);
+    } else {
+      // Full Close
+      const updatedPositions = positions.filter(pos => pos.id !== positionId);
+      setPositions(updatedPositions);
+      localStorage.setItem('velocitySOL_positions', JSON.stringify(updatedPositions));
+      
+      // Add to history
+      const historyEntry = {
+        id: Date.now(),
+        type: 'FULL_CLOSE',
+        symbol: 'SOL',
+        action: position.type,
+        entry: position.entry,
+        exit: currentPrice,
+        size: position.size,
+        pnl: currentPnL,
+        pnlPercent: pnlPercent,
+        timestamp: new Date(),
+        status: 'CLOSED'
+      };
+      
+      const updatedHistory = [...tradingHistory, historyEntry];
+      setTradingHistory(updatedHistory);
+      localStorage.setItem('velocitySOL_history', JSON.stringify(updatedHistory));
+      
+      alert(`Position closed with ${currentPnL >= 0 ? 'profit' : 'loss'}: ${currentPnL.toFixed(2)} (${pnlPercent.toFixed(1)}%)`);
+    }
   };
   
   // Send Modal Component
@@ -671,17 +749,76 @@ const VelocitySOL = () => {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-400">24h P&L:</span>
-                <span className="text-green-400">+$127.50</span>
+                <span className="text-green-400">
+                  ${tradingHistory.length > 0 
+                    ? tradingHistory
+                        .filter(trade => new Date(trade.timestamp) > new Date(Date.now() - 24*60*60*1000))
+                        .reduce((sum, trade) => sum + trade.pnl, 0)
+                        .toFixed(2)
+                    : '0.00'
+                  }
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Win Rate:</span>
-                <span className="text-white">73.2%</span>
+                <span className="text-white">
+                  {tradingHistory.length > 0 
+                    ? ((tradingHistory.filter(trade => trade.pnl > 0).length / tradingHistory.length) * 100).toFixed(1)
+                    : '0.0'
+                  }%
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Total Trades:</span>
+                <span className="text-white">{tradingHistory.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Active Positions:</span>
                 <span className="text-white">{positions.length}</span>
               </div>
             </div>
+            
+            {/* Trading History */}
+            {tradingHistory.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-lg font-bold text-white mb-3">Recent Trades</h3>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {tradingHistory.slice(-5).reverse().map((trade) => (
+                    <div key={trade.id} className="bg-gray-700/30 p-3 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                            trade.pnl >= 0 ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
+                          }`}>
+                            {trade.pnl >= 0 ? '+' : '-'}
+                          </div>
+                          <div>
+                            <div className="text-white text-sm font-medium">
+                              {trade.action} {trade.size.toFixed(2)} SOL
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              ${trade.entry} → ${trade.exit}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`font-medium text-sm ${
+                            trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
+                          </div>
+                          <div className={`text-xs ${
+                            trade.pnlPercent >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {trade.pnlPercent >= 0 ? '+' : ''}{trade.pnlPercent.toFixed(1)}%
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Trading Signal */}
