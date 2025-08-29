@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   const generateAdvancedSignal = async () => {
     try {
       // Get historical data
-      const histResponse = await fetch(`${req.headers.host}/api/historical-data?days=50`);
+      const histResponse = await fetch(`http://${req.headers.host}/api/historical-data?days=50`);
       const histData = await histResponse.json();
       
       if (!histData.success) throw new Error('Failed to fetch historical data');
