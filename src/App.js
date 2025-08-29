@@ -29,6 +29,11 @@ const VelocitySOL = () => {
   const [sendAmount, setSendAmount] = useState('');
   const [sendAddress, setSendAddress] = useState('');
   
+  // Take Profit Modal State
+  const [showTakeProfitModal, setShowTakeProfitModal] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState(null);
+  const [takeProfitPercent, setTakeProfitPercent] = useState('');
+  
   // Backend Configuration - REPLACE WITH YOUR VERCEL URL
   const API_BASE = 'https://velocity-sol-backend.vercel.app/api';
   
@@ -273,7 +278,125 @@ const VelocitySOL = () => {
     }
   };
   
-  // Send Modal Component
+  // Take Profit Modal Component
+  const TakeProfitModal = () => {
+    if (!showTakeProfitModal || !selectedPosition) return null;
+    
+    const currentPnL = (currentPrice - selectedPosition.entry) * selectedPosition.size * (selectedPosition.type.includes('BUY') ? 1 : -1);
+    const currentPnLPercent = ((currentPrice - selectedPosition.entry) / selectedPosition.entry * 100) * (selectedPosition.type.includes('BUY') ? 1 : -1);
+    
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-gray-800 rounded-2xl p-6 max-w-md w-full mx-4 border border-gray-700">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-white">Take Profit</h3>
+            <button onClick={() => setShowTakeProfitModal(false)} className="text-gray-400 hover:text-white">
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="bg-gray-700/50 p-4 rounded-lg">
+              <h4 className="text-white font-medium mb-2">Position Info</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-400">Type: </span>
+                  <span className="text-white">{selectedPosition.type}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Size: </span>
+                  <span className="text-white">{selectedPosition.size.toFixed(2)} SOL</span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Entry: </span>
+                  <span className="text-white">${selectedPosition.entry.toFixed(2)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Current: </span>
+                  <span className="text-white">${currentPrice.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-gray-700/50 p-4 rounded-lg">
+              <h4 className="text-white font-medium mb-2">Current P&L</h4>
+              <div className={`text-2xl font-bold ${currentPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {currentPnL >= 0 ? '+' : ''}${currentPnL.toFixed(2)}
+              </div>
+              <div className={`text-sm ${currentPnLPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {currentPnLPercent >= 0 ? '+' : ''}{currentPnLPercent.toFixed(1)}%
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-gray-400 text-sm mb-2">Close Position Percentage</label>
+              <input
+                type="number"
+                value={takeProfitPercent}
+                onChange={(e) => setTakeProfitPercent(e.target.value)}
+                className="w-full bg-gray-700 text-white p-3 rounded border border-gray-600"
+                placeholder="Enter percentage (1-100)"
+                min="1"
+                max="100"
+                step="1"
+              />
+              <div className="text-xs text-gray-400 mt-1">
+                Example: 25 = Close 25% of position, 100 = Close entire position
+              </div>
+            </div>
+            
+            {takeProfitPercent && (
+              <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
+                <h4 className="text-blue-400 font-medium mb-2">Preview</h4>
+                <div className="text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Close Amount:</span>
+                    <span className="text-white">
+                      {((selectedPosition.size * parseFloat(takeProfitPercent || 0)) / 100).toFixed(2)} SOL
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Remaining:</span>
+                    <span className="text-white">
+                      {(selectedPosition.size * (1 - (parseFloat(takeProfitPercent || 0) / 100))).toFixed(2)} SOL
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Profit/Loss:</span>
+                    <span className={`font-medium ${currentPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      ${(currentPnL * (parseFloat(takeProfitPercent || 0) / 100)).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowTakeProfitModal(false)}
+                className="flex-1 py-2 px-4 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!takeProfitPercent || parseFloat(takeProfitPercent) <= 0) {
+                    alert('Please enter a valid percentage (1-100)');
+                    return;
+                  }
+                  closePosition(selectedPosition.id, 'partial');
+                }}
+                disabled={!takeProfitPercent || parseFloat(takeProfitPercent) <= 0}
+                className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                Execute
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
   const SendModal = () => {
     if (!showSendModal) return null;
     
@@ -849,6 +972,7 @@ const VelocitySOL = () => {
       </div>
       
       {/* Modals */}
+      <TakeProfitModal />
       <SendModal />
       <ReceiveModal />
     </div>
