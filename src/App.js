@@ -48,12 +48,27 @@ const VelocitySOL = () => {
         wallet: 'Phantom'
       });
       
-      // Mock balance
-      const mockBalance = 45.2789 + Math.random() * 10;
-      setRealBalance({
-        sol: Math.max(0, mockBalance),
-        usd: Math.max(0, mockBalance) * currentPrice
-      });
+      // REAL BALANCE - statt Mock
+      try {
+        const balance = await window.solana.request({
+          method: "getBalance",
+          params: [response.publicKey.toString()]
+        });
+        const solBalance = balance / 1000000000; // Convert lamports to SOL
+        setRealBalance({
+          sol: solBalance,
+          usd: solBalance * currentPrice
+        });
+      } catch (balanceError) {
+        console.error('Balance fetch failed, using 0:', balanceError);
+        setRealBalance({ sol: 0, usd: 0 });
+      }
+      
+      // Load saved positions from localStorage
+      const savedPositions = localStorage.getItem('velocitySOL_positions');
+      if (savedPositions) {
+        setPositions(JSON.parse(savedPositions));
+      }
       
       setConnectionStatus('connected');
     } catch (error) {
@@ -72,7 +87,7 @@ const VelocitySOL = () => {
       setIsConnected(false);
       setWalletInfo(null);
       setRealBalance({ sol: 0, usd: 0 });
-      setPositions([]);
+      // Positions NICHT löschen - bleiben erhalten
       setConnectionStatus('disconnected');
     } catch (error) {
       console.error('Logout error:', error);
@@ -119,6 +134,19 @@ const VelocitySOL = () => {
     return () => clearInterval(interval);
   }, [fetchLiveData]);
   
+  // Load positions on app start
+  useEffect(() => {
+    const savedPositions = localStorage.getItem('velocitySOL_positions');
+    if (savedPositions) {
+      try {
+        const parsedPositions = JSON.parse(savedPositions);
+        setPositions(parsedPositions);
+      } catch (error) {
+        console.error('Error loading positions:', error);
+      }
+    }
+  }, []);
+  
   // Execute Trade
   const executeTrade = async () => {
     if (!tradingSignal) {
@@ -141,8 +169,13 @@ const VelocitySOL = () => {
         status: 'ACTIVE'
       };
       
-      setPositions(prev => [...prev, newPosition]);
-      alert(`Paper Trade Executed: ${tradingSignal.action} ${newPosition.size.toFixed(2)} SOL at $${tradingSignal.entry}`);
+      const updatedPositions = [...positions, newPosition];
+      setPositions(updatedPositions);
+      
+      // Save to localStorage
+      localStorage.setItem('velocitySOL_positions', JSON.stringify(updatedPositions));
+      
+      alert(`Paper Trade Executed: ${tradingSignal.action} ${newPosition.size.toFixed(2)} SOL at ${tradingSignal.entry}`);
       return;
     }
     
@@ -153,6 +186,13 @@ const VelocitySOL = () => {
     
     // For live trading - would implement Jupiter swap execution here
     alert(`Live trading not yet implemented. Use paper trading mode.`);
+  };
+  
+  // Close Position Function
+  const closePosition = (positionId) => {
+    const updatedPositions = positions.filter(pos => pos.id !== positionId);
+    setPositions(updatedPositions);
+    localStorage.setItem('velocitySOL_positions', JSON.stringify(updatedPositions));
   };
   
   // Send Modal Component
@@ -441,10 +481,21 @@ const VelocitySOL = () => {
               </div>
               
               <div className="flex gap-2 mt-3">
-                <button className="flex-1 bg-green-600 text-white py-2 px-3 rounded text-xs">
+                <button 
+                  onClick={() => {
+                    // Take Profit Logic
+                    const profit = (currentPrice - position.entry) * position.size;
+                    alert(`Position closed with profit: ${profit.toFixed(2)}`);
+                    closePosition(position.id);
+                  }}
+                  className="flex-1 bg-green-600 text-white py-2 px-3 rounded text-xs"
+                >
                   Take Profit
                 </button>
-                <button className="flex-1 bg-red-600 text-white py-2 px-3 rounded text-xs">
+                <button 
+                  onClick={() => closePosition(position.id)}
+                  className="flex-1 bg-red-600 text-white py-2 px-3 rounded text-xs"
+                >
                   Close Position
                 </button>
               </div>
