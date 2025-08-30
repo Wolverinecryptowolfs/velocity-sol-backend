@@ -273,6 +273,7 @@ const VelocitySOL = () => {
     }
   };
   
+  // Send Modal Component
   const SendModal = () => {
     if (!showSendModal) return null;
     
@@ -656,3 +657,242 @@ const VelocitySOL = () => {
               <div className="flex items-center gap-3 mb-2">
                 <Target className="text-blue-400" size={20} />
                 <h3 className="text-white font-medium">Jupiter Integration</h3>
+              </div>
+              <p className="text-gray-400 text-sm">Best price execution on Solana DEX</p>
+            </div>
+          </div>
+
+          <button
+            onClick={connectWallet}
+            disabled={connectionStatus === 'connecting'}
+            className={`w-full py-3 px-4 rounded-xl font-medium transition-all ${
+              connectionStatus === 'connecting'
+                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:shadow-lg'
+            }`}
+          >
+            {connectionStatus === 'connecting' ? 'Connecting...' : 'Connect Phantom Wallet'}
+          </button>
+          
+          <div className="mt-4 text-center">
+            <p className="text-gray-500 text-xs">
+              Current SOL: ${currentPrice.toFixed(2)} ({priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(1)}%)
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/10 to-blue-900/10">
+      {/* Header - Updated with Logout */}
+      <div className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center">
+                <Zap className="text-white" size={24} />
+              </div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                VelocitySOL
+              </h1>
+              <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded-lg text-xs">
+                LIVE
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              {/* Price Display */}
+              <div className="text-right">
+                <div className="text-white font-medium">${currentPrice.toFixed(2)}</div>
+                <div className={`text-xs ${priceChange24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(1)}%
+                </div>
+              </div>
+              
+              {/* Wallet Info */}
+              {walletInfo && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-700/50 rounded-lg">
+                  <Wallet className="text-blue-400" size={16} />
+                  <span className="text-gray-300 text-sm font-mono">
+                    {walletInfo.address.slice(0, 4)}...{walletInfo.address.slice(-4)}
+                  </span>
+                  <button onClick={() => navigator.clipboard.writeText(walletInfo.address)}>
+                    <Copy className="text-gray-400 hover:text-white" size={12} />
+                  </button>
+                </div>
+              )}
+              
+              {/* Refresh Button */}
+              <button
+                onClick={fetchLiveData}
+                disabled={isLoading}
+                className="p-2 bg-gray-700/50 text-gray-400 hover:text-white rounded-lg transition-colors"
+                title="Refresh Data"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
+
+              {/* Logout Button */}
+              <button
+                onClick={disconnectWallet}
+                className="px-3 py-2 bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded-lg transition-colors text-sm"
+                title="Disconnect Wallet"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Portfolio Summary - Updated with Send/Receive */}
+          <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-white">Portfolio</h2>
+              <button onClick={() => setShowBalance(!showBalance)} className="text-gray-400 hover:text-white">
+                {showBalance ? <Eye size={20} /> : <EyeOff size={20} />}
+              </button>
+            </div>
+            
+            <div className="mb-6">
+              <div className="text-3xl font-bold text-white mb-2">
+                {showBalance ? ' + realBalance.usd.toFixed(2) : '••••••'}
+              </div>
+              <div className="text-green-400 text-sm">
+                {realBalance.sol.toFixed(4)} SOL
+              </div>
+            </div>
+            
+            {/* Send/Receive Buttons */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <button
+                onClick={() => setShowSendModal(true)}
+                className="flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Send size={16} />
+                Send
+              </button>
+              <button
+                onClick={() => setShowReceiveModal(true)}
+                className="flex items-center justify-center gap-2 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <Download size={16} />
+                Receive
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-400">24h P&L:</span>
+                <span className="text-green-400">
+                  ${tradingHistory.length > 0 
+                    ? tradingHistory
+                        .filter(trade => new Date(trade.timestamp) > new Date(Date.now() - 24*60*60*1000))
+                        .reduce((sum, trade) => sum + trade.pnl, 0)
+                        .toFixed(2)
+                    : '0.00'
+                  }
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Win Rate:</span>
+                <span className="text-white">
+                  {tradingHistory.length > 0 
+                    ? ((tradingHistory.filter(trade => trade.pnl > 0).length / tradingHistory.length) * 100).toFixed(1)
+                    : '0.0'
+                  }%
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Total Trades:</span>
+                <span className="text-white">{tradingHistory.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Active Positions:</span>
+                <span className="text-white">{positions.length}</span>
+              </div>
+            </div>
+            
+            {/* Trading History */}
+            {tradingHistory.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-lg font-bold text-white mb-3">Recent Trades</h3>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {tradingHistory.slice(-5).reverse().map((trade) => (
+                    <div key={trade.id} className="bg-gray-700/30 p-3 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                            trade.pnl >= 0 ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
+                          }`}>
+                            {trade.pnl >= 0 ? '+' : '-'}
+                          </div>
+                          <div>
+                            <div className="text-white text-sm font-medium">
+                              {trade.action} {trade.size.toFixed(2)} SOL
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              ${trade.entry} → ${trade.exit}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`font-medium text-sm ${
+                            trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
+                          </div>
+                          <div className={`text-xs ${
+                            trade.pnlPercent >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {trade.pnlPercent >= 0 ? '+' : ''}{trade.pnlPercent.toFixed(1)}%
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Trading Signal */}
+          <div className="lg:col-span-2">
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-white">AI Trading Signal</h2>
+                <button
+                  onClick={fetchLiveData}
+                  disabled={isLoading}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
+              
+              {renderSignalCard()}
+            </div>
+            
+            {/* Active Positions */}
+            <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700">
+              <h3 className="text-xl font-bold text-white mb-4">Active Positions</h3>
+              {renderPositions()}
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Modals */}
+      <SendModal />
+      <ReceiveModal />
+    </div>
+  );
+};
+
+export default VelocitySOL;
