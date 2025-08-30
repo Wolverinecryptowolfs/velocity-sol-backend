@@ -6,14 +6,12 @@ import {
 } from 'lucide-react';
 
 const VelocitySOL = () => {
-  const [activeTab, setActiveTab] = useState('portfolio');
   const [isConnected, setIsConnected] = useState(false);
   const [walletInfo, setWalletInfo] = useState(null);
   const [showBalance, setShowBalance] = useState(true);
   const [currentPrice, setCurrentPrice] = useState(119.75);
   const [priceChange24h, setPriceChange24h] = useState(2.4);
   const [tradingSignal, setTradingSignal] = useState(null);
-  const [historicalData, setHistoricalData] = useState(null);
   const [positions, setPositions] = useState([]);
   const [tradingHistory, setTradingHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -21,7 +19,6 @@ const VelocitySOL = () => {
   const [realBalance, setRealBalance] = useState({ sol: 0, usd: 0 });
   const [positionSize, setPositionSize] = useState('1000');
   const [tradingMode, setTradingMode] = useState('paper');
-  
   const [showSendModal, setShowSendModal] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [sendAmount, setSendAmount] = useState('');
@@ -30,7 +27,7 @@ const VelocitySOL = () => {
   const API_BASE = 'https://velocity-sol-backend.vercel.app/api';
   
   const connectWallet = useCallback(async () => {
-    if (typeof window === 'undefined' || !window.solana?.isPhantom) {
+    if (typeof window === 'undefined' || !window.solana || !window.solana.isPhantom) {
       alert('Please install Phantom Wallet: https://phantom.app/');
       return;
     }
@@ -56,7 +53,7 @@ const VelocitySOL = () => {
           usd: solBalance * currentPrice
         });
       } catch (balanceError) {
-        console.error('Balance fetch failed, using 0:', balanceError);
+        console.error('Balance fetch failed:', balanceError);
         setRealBalance({ sol: 0, usd: 0 });
       }
       
@@ -101,13 +98,6 @@ const VelocitySOL = () => {
         setPriceChange24h(priceData.change24h || 0);
       }
       
-      const histResponse = await fetch(API_BASE + '/historical-data?days=50');
-      const histData = await histResponse.json();
-      
-      if (histData.success || histData.fallback) {
-        setHistoricalData(histData.fallback || histData);
-      }
-      
       const signalResponse = await fetch(API_BASE + '/trading-signals');
       const signalData = await signalResponse.json();
       
@@ -118,7 +108,7 @@ const VelocitySOL = () => {
     } catch (error) {
       console.error('Data fetch error:', error);
     }
-  }, [API_BASE]);
+  }, []);
   
   useEffect(() => {
     fetchLiveData();
@@ -131,16 +121,14 @@ const VelocitySOL = () => {
     const savedHistory = localStorage.getItem('velocitySOL_history');
     if (savedPositions) {
       try {
-        const parsedPositions = JSON.parse(savedPositions);
-        setPositions(parsedPositions);
+        setPositions(JSON.parse(savedPositions));
       } catch (error) {
         console.error('Error loading positions:', error);
       }
     }
     if (savedHistory) {
       try {
-        const parsedHistory = JSON.parse(savedHistory);
-        setTradingHistory(parsedHistory);
+        setTradingHistory(JSON.parse(savedHistory));
       } catch (error) {
         console.error('Error loading history:', error);
       }
@@ -170,7 +158,6 @@ const VelocitySOL = () => {
       
       const updatedPositions = [...positions, newPosition];
       setPositions(updatedPositions);
-      
       localStorage.setItem('velocitySOL_positions', JSON.stringify(updatedPositions));
       
       alert('Paper Trade Executed: ' + tradingSignal.action + ' ' + newPosition.size.toFixed(2) + ' SOL at ' + tradingSignal.entry);
@@ -185,20 +172,50 @@ const VelocitySOL = () => {
     alert('Live trading not yet implemented. Use paper trading mode.');
   };
   
-  const closePosition = (positionId, partial = false) => {
+  const closePosition = (positionId) => {
     const position = positions.find(pos => pos.id === positionId);
     if (!position) return;
     
     const currentPnL = (currentPrice - position.entry) * position.size * (position.type.includes('BUY') ? 1 : -1);
     const pnlPercent = ((currentPrice - position.entry) / position.entry * 100) * (position.type.includes('BUY') ? 1 : -1);
     
-    if (partial) {
-      const newSize = position.size * 0.5;
-      const partialPnL = currentPnL * 0.5;
+    const updatedPositions = positions.filter(pos => pos.id !== positionId);
+    setPositions(updatedPositions);
+    localStorage.setItem('velocitySOL_positions', JSON.stringify(updatedPositions));
+    
+    const historyEntry = {
+      id: Date.now(),
+      type: 'FULL_CLOSE',
+      symbol: 'SOL',
+      action: position.type,
+      entry: position.entry,
+      exit: currentPrice,
+      size: position.size,
+      pnl: currentPnL,
+      pnlPercent: pnlPercent,
+      timestamp: new Date(),
+      status: 'CLOSED'
+    };
+    
+    const updatedHistory = [...tradingHistory, historyEntry];
+    setTradingHistory(updatedHistory);
+    localStorage.setItem('velocitySOL_history', JSON.stringify(updatedHistory));
+    
+    alert('Position closed with ' + (currentPnL >= 0 ? 'profit' : 'loss') + ': ' + currentPnL.toFixed(2) + ' (' + pnlPercent.toFixed(1) + '%)');
+  };
+  
+  const takeProfitAction = (position) => {
+    const currentPnL = ((currentPrice - position.entry) / position.entry * 100) * (position.type.includes('BUY') ? 1 : -1);
+    
+    if (currentPnL > 0) {
+      const profitPercent = Math.abs(currentPnL);
+      const closePercent = Math.min(profitPercent, 50);
+      const pnlUSD = (currentPrice - position.entry) * position.size * (position.type.includes('BUY') ? 1 : -1);
+      const partialPnL = pnlUSD * (closePercent / 100);
       
       const updatedPositions = positions.map(pos => 
-        pos.id === positionId 
-          ? { ...pos, size: newSize }
+        pos.id === position.id 
+          ? { ...pos, size: pos.size * (1 - closePercent / 100) }
           : pos
       );
       setPositions(updatedPositions);
@@ -206,14 +223,14 @@ const VelocitySOL = () => {
       
       const historyEntry = {
         id: Date.now(),
-        type: 'PARTIAL_CLOSE',
+        type: 'PROFIT_TAKE',
         symbol: 'SOL',
         action: position.type,
         entry: position.entry,
         exit: currentPrice,
-        size: position.size * 0.5,
+        size: position.size * (closePercent / 100),
         pnl: partialPnL,
-        pnlPercent: pnlPercent,
+        pnlPercent: profitPercent,
         timestamp: new Date(),
         status: 'CLOSED'
       };
@@ -222,31 +239,9 @@ const VelocitySOL = () => {
       setTradingHistory(updatedHistory);
       localStorage.setItem('velocitySOL_history', JSON.stringify(updatedHistory));
       
-      alert('Partial close: 50% of position closed with ' + (partialPnL >= 0 ? 'profit' : 'loss') + ': ' + partialPnL.toFixed(2));
+      alert('Profit secured: ' + closePercent.toFixed(0) + '% of position closed (+$' + partialPnL.toFixed(2) + ')');
     } else {
-      const updatedPositions = positions.filter(pos => pos.id !== positionId);
-      setPositions(updatedPositions);
-      localStorage.setItem('velocitySOL_positions', JSON.stringify(updatedPositions));
-      
-      const historyEntry = {
-        id: Date.now(),
-        type: 'FULL_CLOSE',
-        symbol: 'SOL',
-        action: position.type,
-        entry: position.entry,
-        exit: currentPrice,
-        size: position.size,
-        pnl: currentPnL,
-        pnlPercent: pnlPercent,
-        timestamp: new Date(),
-        status: 'CLOSED'
-      };
-      
-      const updatedHistory = [...tradingHistory, historyEntry];
-      setTradingHistory(updatedHistory);
-      localStorage.setItem('velocitySOL_history', JSON.stringify(updatedHistory));
-      
-      alert('Position closed with ' + (currentPnL >= 0 ? 'profit' : 'loss') + ': ' + currentPnL.toFixed(2) + ' (' + pnlPercent.toFixed(1) + '%)');
+      alert('Position is not in profit. Current P&L: ' + currentPnL.toFixed(1) + '%');
     }
   };
   
@@ -299,7 +294,7 @@ const VelocitySOL = () => {
               </button>
               <button
                 onClick={() => {
-                  alert('Send functionality would be implemented here with real Solana transaction');
+                  alert('Send functionality would be implemented here');
                   setShowSendModal(false);
                 }}
                 className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -339,7 +334,11 @@ const VelocitySOL = () => {
                 {walletInfo && walletInfo.address}
               </div>
               <button
-                onClick={() => navigator.clipboard.writeText(walletInfo && walletInfo.address)}
+                onClick={() => {
+                  if (walletInfo && walletInfo.address) {
+                    navigator.clipboard.writeText(walletInfo.address);
+                  }
+                }}
                 className="mt-2 text-blue-400 hover:text-blue-300 text-sm"
               >
                 Copy Address
@@ -354,9 +353,21 @@ const VelocitySOL = () => {
   const renderSignalCard = () => {
     if (!tradingSignal) return null;
     
-    const isPositive = tradingSignal.action.includes('BUY');
-    const confidenceColor = tradingSignal.confidence > 80 ? 'text-green-400' : 
-                           tradingSignal.confidence > 60 ? 'text-yellow-400' : 'text-red-400';
+    const isPositive = tradingSignal.action && tradingSignal.action.includes('BUY');
+    
+    let confidenceColor = 'text-red-400';
+    if (tradingSignal.confidence > 80) {
+      confidenceColor = 'text-green-400';
+    } else if (tradingSignal.confidence > 60) {
+      confidenceColor = 'text-yellow-400';
+    }
+    
+    let buttonClass = 'bg-gray-600 text-gray-300 cursor-not-allowed';
+    if (tradingSignal.confidence > 80) {
+      buttonClass = 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-lg';
+    } else if (tradingSignal.confidence > 60) {
+      buttonClass = 'bg-gradient-to-r from-yellow-600 to-yellow-700 text-white hover:shadow-lg';
+    }
     
     return (
       <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-2xl p-6 border border-purple-500/30">
@@ -399,40 +410,7 @@ const VelocitySOL = () => {
           </div>
         </div>
         
-        <div className="bg-gray-800/30 p-4 rounded-lg mb-4">
-          <h4 className="text-white font-medium mb-2">Technical Analysis</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <span className="text-gray-400">RSI: </span>
-              <span className="text-white">{(tradingSignal.technicals && tradingSignal.technicals.rsi) || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-gray-400">MACD: </span>
-              <span className="text-white">{(tradingSignal.technicals && tradingSignal.technicals.macd) || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-gray-400">SMA20: </span>
-              <span className="text-white">${(tradingSignal.technicals && tradingSignal.technicals.sma20) || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="text-gray-400">Volatility: </span>
-              <span className="text-white">{(((tradingSignal.technicals && tradingSignal.technicals.volatility) || 0) * 100).toFixed(1)}%</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-gray-800/30 p-4 rounded-lg mb-4">
-          <h4 className="text-white font-medium mb-2">Supporting Signals</h4>
-          <div className="flex flex-wrap gap-2">
-            {(tradingSignal.signals || []).map((signal, index) => (
-              <span key={index} className="px-2 py-1 bg-blue-600/20 text-blue-400 rounded text-xs">
-                {signal}
-              </span>
-            ))}
-          </div>
-        </div>
-        
-        <div className="flex gap-3">
+        <div className="flex gap-3 mb-4">
           <div className="flex-1">
             <label className="block text-gray-400 text-xs mb-1">Position Size (USD)</label>
             <input
@@ -459,15 +437,7 @@ const VelocitySOL = () => {
         <button
           onClick={executeTrade}
           disabled={isLoading || tradingSignal.confidence < 60}
-          className={
-            'w-full mt-4 py-3 px-4 rounded-xl font-medium transition-all ' + (
-              tradingSignal.confidence > 80
-                ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-lg'
-                : tradingSignal.confidence > 60
-                ? 'bg-gradient-to-r from-yellow-600 to-yellow-700 text-white hover:shadow-lg'
-                : 'bg-gray-600 text-gray-300 cursor-not-allowed'
-            )
-          }
+          className={'w-full py-3 px-4 rounded-xl font-medium transition-all ' + buttonClass}
         >
           {isLoading ? 'Executing...' : 'Execute ' + tradingSignal.action + ' Trade'}
           <span className="ml-2 text-xs">({tradingSignal.confidence}% confidence)</span>
@@ -495,15 +465,19 @@ const VelocitySOL = () => {
           const pnlUSD = (currentPrice - position.entry) * position.size * 
             (position.type.includes('BUY') ? 1 : -1);
           
+          const pnlColorClass = currentPnL >= 0 ? 'text-green-400' : 'text-red-400';
+          const pnlUSDColorClass = pnlUSD >= 0 ? 'text-green-400' : 'text-red-400';
+          const iconBgClass = position.type.includes('BUY') ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400';
+          
+          const takeProfitButtonClass = currentPnL > 0 
+            ? 'bg-green-600 text-white hover:bg-green-700' 
+            : 'bg-gray-600 text-gray-400 cursor-not-allowed';
+          
           return (
             <div key={position.id} className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className={
-                    'w-10 h-10 rounded-full flex items-center justify-center ' + (
-                      position.type.includes('BUY') ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
-                    )
-                  }>
+                  <div className={'w-10 h-10 rounded-full flex items-center justify-center ' + iconBgClass}>
                     {position.type.includes('BUY') ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
                   </div>
                   <div>
@@ -512,10 +486,10 @@ const VelocitySOL = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className={'font-bold text-lg ' + (currentPnL >= 0 ? 'text-green-400' : 'text-red-400')}>
+                  <div className={'font-bold text-lg ' + pnlColorClass}>
                     {currentPnL >= 0 ? '+' : ''}{currentPnL.toFixed(1)}%
                   </div>
-                  <div className={'text-sm ' + (pnlUSD >= 0 ? 'text-green-400' : 'text-red-400')}>
+                  <div className={'text-sm ' + pnlUSDColorClass}>
                     ${pnlUSD >= 0 ? '+' : ''}{pnlUSD.toFixed(2)}
                   </div>
                 </div>
@@ -538,52 +512,9 @@ const VelocitySOL = () => {
               
               <div className="flex gap-2 mt-3">
                 <button 
-                  onClick={() => {
-                    if (currentPnL > 0) {
-                      const profitPercent = Math.abs(currentPnL);
-                      const closePercent = Math.min(profitPercent, 50);
-                      const pnlUSD = (currentPrice - position.entry) * position.size * (position.type.includes('BUY') ? 1 : -1);
-                      const partialPnL = pnlUSD * (closePercent / 100);
-                      
-                      const updatedPositions = positions.map(pos => 
-                        pos.id === position.id 
-                          ? { ...pos, size: pos.size * (1 - closePercent / 100) }
-                          : pos
-                      );
-                      setPositions(updatedPositions);
-                      localStorage.setItem('velocitySOL_positions', JSON.stringify(updatedPositions));
-                      
-                      const historyEntry = {
-                        id: Date.now(),
-                        type: 'PROFIT_TAKE',
-                        symbol: 'SOL',
-                        action: position.type,
-                        entry: position.entry,
-                        exit: currentPrice,
-                        size: position.size * (closePercent / 100),
-                        pnl: partialPnL,
-                        pnlPercent: profitPercent,
-                        timestamp: new Date(),
-                        status: 'CLOSED'
-                      };
-                      
-                      const updatedHistory = [...tradingHistory, historyEntry];
-                      setTradingHistory(updatedHistory);
-                      localStorage.setItem('velocitySOL_history', JSON.stringify(updatedHistory));
-                      
-                      alert('Profit secured: ' + closePercent.toFixed(0) + '% of position closed (+$' + partialPnL.toFixed(2) + ')');
-                    } else {
-                      alert('Position is not in profit. Current P&L: ' + currentPnL.toFixed(1) + '%');
-                    }
-                  }}
+                  onClick={() => takeProfitAction(position)}
                   disabled={currentPnL <= 0}
-                  className={
-                    'flex-1 py-2 px-3 rounded text-xs font-medium ' + (
-                      currentPnL > 0 
-                        ? 'bg-green-600 text-white hover:bg-green-700' 
-                        : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                    )
-                  }
+                  className={'flex-1 py-2 px-3 rounded text-xs font-medium ' + takeProfitButtonClass}
                 >
                   Take Profit {currentPnL > 0 ? '(+' + currentPnL.toFixed(1) + '%)' : ''}
                 </button>
@@ -642,12 +573,9 @@ const VelocitySOL = () => {
           <button
             onClick={connectWallet}
             disabled={connectionStatus === 'connecting'}
-            className={
-              'w-full py-3 px-4 rounded-xl font-medium transition-all ' + (
-                connectionStatus === 'connecting'
-                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:shadow-lg'
-              )
+            className={connectionStatus === 'connecting' 
+              ? 'w-full py-3 px-4 rounded-xl font-medium bg-gray-600 text-gray-400 cursor-not-allowed'
+              : 'w-full py-3 px-4 rounded-xl font-medium bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:shadow-lg'
             }
           >
             {connectionStatus === 'connecting' ? 'Connecting...' : 'Connect Phantom Wallet'}
@@ -683,7 +611,7 @@ const VelocitySOL = () => {
             <div className="flex items-center gap-4">
               <div className="text-right">
                 <div className="text-white font-medium">${currentPrice.toFixed(2)}</div>
-                <div className={'text-xs ' + (priceChange24h >= 0 ? 'text-green-400' : 'text-red-400')}>
+                <div className={priceChange24h >= 0 ? 'text-xs text-green-400' : 'text-xs text-red-400'}>
                   {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(1)}%
                 </div>
               </div>
@@ -706,7 +634,7 @@ const VelocitySOL = () => {
                 className="p-2 bg-gray-700/50 text-gray-400 hover:text-white rounded-lg transition-colors"
                 title="Refresh Data"
               >
-                <RefreshCw className={'w-4 h-4 ' + (isLoading ? 'animate-spin' : '')} />
+                <RefreshCw className={isLoading ? 'w-4 h-4 animate-spin' : 'w-4 h-4'} />
               </button>
 
               <button
@@ -797,10 +725,9 @@ const VelocitySOL = () => {
                     <div key={trade.id} className="bg-gray-700/30 p-3 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className={
-                            'w-6 h-6 rounded-full flex items-center justify-center ' + (
-                              trade.pnl >= 0 ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
-                            )
+                          <div className={trade.pnl >= 0 
+                            ? 'w-6 h-6 rounded-full flex items-center justify-center bg-green-600/20 text-green-400' 
+                            : 'w-6 h-6 rounded-full flex items-center justify-center bg-red-600/20 text-red-400'
                           }>
                             {trade.pnl >= 0 ? '+' : '-'}
                           </div>
@@ -814,18 +741,10 @@ const VelocitySOL = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className={
-                            'font-medium text-sm ' + (
-                              trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'
-                            )
-                          }>
+                          <div className={trade.pnl >= 0 ? 'font-medium text-sm text-green-400' : 'font-medium text-sm text-red-400'}>
                             {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
                           </div>
-                          <div className={
-                            'text-xs ' + (
-                              trade.pnlPercent >= 0 ? 'text-green-400' : 'text-red-400'
-                            )
-                          }>
+                          <div className={trade.pnlPercent >= 0 ? 'text-xs text-green-400' : 'text-xs text-red-400'}>
                             {trade.pnlPercent >= 0 ? '+' : ''}{trade.pnlPercent.toFixed(1)}%
                           </div>
                         </div>
@@ -846,7 +765,7 @@ const VelocitySOL = () => {
                   disabled={isLoading}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
-                  <RefreshCw className={'w-4 h-4 ' + (isLoading ? 'animate-spin' : '')} />
+                  <RefreshCw className={isLoading ? 'w-4 h-4 animate-spin' : 'w-4 h-4'} />
                   Refresh
                 </button>
               </div>
