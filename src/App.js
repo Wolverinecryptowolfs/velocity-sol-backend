@@ -753,7 +753,7 @@ const VelocitySOL = () => {
             
             <div className="mb-6">
               <div className="text-3xl font-bold text-white mb-2">
-                {showBalance ? '">
+                {showBalance ? '$' + realBalance.usd.toFixed(2) : '••••••'}
               <div className="flex items-center gap-3 mb-2">
                 <Shield className="text-green-400" size={20} />
                 <h3 className="text-white font-medium">Risk Management</h3>
