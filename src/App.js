@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 
 const VelocitySOL = () => {
-  // State Management
   const [activeTab, setActiveTab] = useState('portfolio');
   const [isConnected, setIsConnected] = useState(false);
   const [walletInfo, setWalletInfo] = useState(null);
@@ -23,16 +22,13 @@ const VelocitySOL = () => {
   const [positionSize, setPositionSize] = useState('1000');
   const [tradingMode, setTradingMode] = useState('paper');
   
-  // Send/Receive Modal State
   const [showSendModal, setShowSendModal] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [sendAmount, setSendAmount] = useState('');
   const [sendAddress, setSendAddress] = useState('');
   
-  // Backend Configuration - REPLACE WITH YOUR VERCEL URL
   const API_BASE = 'https://velocity-sol-backend.vercel.app/api';
   
-  // Wallet Integration
   const connectWallet = useCallback(async () => {
     if (typeof window === 'undefined' || !window.solana?.isPhantom) {
       alert('Please install Phantom Wallet: https://phantom.app/');
@@ -49,13 +45,12 @@ const VelocitySOL = () => {
         wallet: 'Phantom'
       });
       
-      // REAL BALANCE - statt Mock
       try {
         const balance = await window.solana.request({
           method: "getBalance",
           params: [response.publicKey.toString()]
         });
-        const solBalance = balance / 1000000000; // Convert lamports to SOL
+        const solBalance = balance / 1000000000;
         setRealBalance({
           sol: solBalance,
           usd: solBalance * currentPrice
@@ -65,7 +60,6 @@ const VelocitySOL = () => {
         setRealBalance({ sol: 0, usd: 0 });
       }
       
-      // Load saved positions and history from localStorage
       const savedPositions = localStorage.getItem('velocitySOL_positions');
       const savedHistory = localStorage.getItem('velocitySOL_history');
       if (savedPositions) {
@@ -83,7 +77,6 @@ const VelocitySOL = () => {
     }
   }, [currentPrice]);
   
-  // Disconnect Wallet
   const disconnectWallet = async () => {
     try {
       if (window.solana) {
@@ -92,17 +85,14 @@ const VelocitySOL = () => {
       setIsConnected(false);
       setWalletInfo(null);
       setRealBalance({ sol: 0, usd: 0 });
-      // Positions NICHT löschen - bleiben erhalten
       setConnectionStatus('disconnected');
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
   
-  // Live Data Fetching
   const fetchLiveData = useCallback(async () => {
     try {
-      // Get current price
       const priceResponse = await fetch(`${API_BASE}/price-hybrid`);
       const priceData = await priceResponse.json();
       
@@ -111,7 +101,6 @@ const VelocitySOL = () => {
         setPriceChange24h(priceData.change24h || 0);
       }
       
-      // Get historical data with technicals
       const histResponse = await fetch(`${API_BASE}/historical-data?days=50`);
       const histData = await histResponse.json();
       
@@ -119,7 +108,6 @@ const VelocitySOL = () => {
         setHistoricalData(histData.fallback || histData);
       }
       
-      // Get trading signal
       const signalResponse = await fetch(`${API_BASE}/trading-signals`);
       const signalData = await signalResponse.json();
       
@@ -132,14 +120,12 @@ const VelocitySOL = () => {
     }
   }, [API_BASE]);
   
-  // Initialize and Live Updates
   useEffect(() => {
     fetchLiveData();
-    const interval = setInterval(fetchLiveData, 30000); // Update every 30 seconds
+    const interval = setInterval(fetchLiveData, 30000);
     return () => clearInterval(interval);
   }, [fetchLiveData]);
   
-  // Load positions and history on app start
   useEffect(() => {
     const savedPositions = localStorage.getItem('velocitySOL_positions');
     const savedHistory = localStorage.getItem('velocitySOL_history');
@@ -161,7 +147,6 @@ const VelocitySOL = () => {
     }
   }, []);
   
-  // Execute Trade
   const executeTrade = async () => {
     if (!tradingSignal) {
       alert('No trading signal available');
@@ -186,7 +171,6 @@ const VelocitySOL = () => {
       const updatedPositions = [...positions, newPosition];
       setPositions(updatedPositions);
       
-      // Save to localStorage
       localStorage.setItem('velocitySOL_positions', JSON.stringify(updatedPositions));
       
       alert(`Paper Trade Executed: ${tradingSignal.action} ${newPosition.size.toFixed(2)} SOL at ${tradingSignal.entry}`);
@@ -198,11 +182,9 @@ const VelocitySOL = () => {
       return;
     }
     
-    // For live trading - would implement Jupiter swap execution here
     alert(`Live trading not yet implemented. Use paper trading mode.`);
   };
   
-  // Close Position Function - Updated with partial close and history
   const closePosition = (positionId, partial = false) => {
     const position = positions.find(pos => pos.id === positionId);
     if (!position) return;
@@ -211,11 +193,9 @@ const VelocitySOL = () => {
     const pnlPercent = ((currentPrice - position.entry) / position.entry * 100) * (position.type.includes('BUY') ? 1 : -1);
     
     if (partial) {
-      // Take Profit - Close 50% of position
       const newSize = position.size * 0.5;
       const partialPnL = currentPnL * 0.5;
       
-      // Update position with smaller size
       const updatedPositions = positions.map(pos => 
         pos.id === positionId 
           ? { ...pos, size: newSize }
@@ -224,7 +204,6 @@ const VelocitySOL = () => {
       setPositions(updatedPositions);
       localStorage.setItem('velocitySOL_positions', JSON.stringify(updatedPositions));
       
-      // Add to history
       const historyEntry = {
         id: Date.now(),
         type: 'PARTIAL_CLOSE',
@@ -245,12 +224,10 @@ const VelocitySOL = () => {
       
       alert(`Partial close: 50% of position closed with ${partialPnL >= 0 ? 'profit' : 'loss'}: ${partialPnL.toFixed(2)}`);
     } else {
-      // Full Close
       const updatedPositions = positions.filter(pos => pos.id !== positionId);
       setPositions(updatedPositions);
       localStorage.setItem('velocitySOL_positions', JSON.stringify(updatedPositions));
       
-      // Add to history
       const historyEntry = {
         id: Date.now(),
         type: 'FULL_CLOSE',
@@ -273,7 +250,6 @@ const VelocitySOL = () => {
     }
   };
   
-  // Send Modal Component
   const SendModal = () => {
     if (!showSendModal) return null;
     
@@ -337,7 +313,6 @@ const VelocitySOL = () => {
     );
   };
 
-  // Receive Modal Component
   const ReceiveModal = () => {
     if (!showReceiveModal) return null;
     
@@ -376,7 +351,6 @@ const VelocitySOL = () => {
     );
   };
   
-  // Component Rendering
   const renderSignalCard = () => {
     if (!tradingSignal) return null;
     
@@ -562,13 +536,11 @@ const VelocitySOL = () => {
                 <button 
                   onClick={() => {
                     if (currentPnL > 0) {
-                      // Calculate how much to close to secure the profit
                       const profitPercent = Math.abs(currentPnL);
-                      const closePercent = Math.min(profitPercent, 50); // Close max 50% or the profit percent
+                      const closePercent = Math.min(profitPercent, 50);
                       const pnlUSD = (currentPrice - position.entry) * position.size * (position.type.includes('BUY') ? 1 : -1);
                       const partialPnL = pnlUSD * (closePercent / 100);
                       
-                      // Close partial position
                       const updatedPositions = positions.map(pos => 
                         pos.id === position.id 
                           ? { ...pos, size: pos.size * (1 - closePercent / 100) }
@@ -577,7 +549,6 @@ const VelocitySOL = () => {
                       setPositions(updatedPositions);
                       localStorage.setItem('velocitySOL_positions', JSON.stringify(updatedPositions));
                       
-                      // Add to history
                       const historyEntry = {
                         id: Date.now(),
                         type: 'PROFIT_TAKE',
@@ -686,7 +657,6 @@ const VelocitySOL = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/10 to-blue-900/10">
-      {/* Header - Updated with Logout */}
       <div className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -703,7 +673,6 @@ const VelocitySOL = () => {
             </div>
             
             <div className="flex items-center gap-4">
-              {/* Price Display */}
               <div className="text-right">
                 <div className="text-white font-medium">${currentPrice.toFixed(2)}</div>
                 <div className={`text-xs ${priceChange24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -711,7 +680,6 @@ const VelocitySOL = () => {
                 </div>
               </div>
               
-              {/* Wallet Info */}
               {walletInfo && (
                 <div className="flex items-center gap-2 px-3 py-2 bg-gray-700/50 rounded-lg">
                   <Wallet className="text-blue-400" size={16} />
@@ -724,7 +692,6 @@ const VelocitySOL = () => {
                 </div>
               )}
               
-              {/* Refresh Button */}
               <button
                 onClick={fetchLiveData}
                 disabled={isLoading}
@@ -734,7 +701,6 @@ const VelocitySOL = () => {
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
 
-              {/* Logout Button */}
               <button
                 onClick={disconnectWallet}
                 className="px-3 py-2 bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded-lg transition-colors text-sm"
@@ -747,10 +713,8 @@ const VelocitySOL = () => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Portfolio Summary - Updated with Send/Receive */}
           <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-white">Portfolio</h2>
@@ -761,14 +725,13 @@ const VelocitySOL = () => {
             
             <div className="mb-6">
               <div className="text-3xl font-bold text-white mb-2">
-                {showBalance ? ' + realBalance.usd.toFixed(2) : '••••••'}
+                {showBalance ? ' + realBalance.usd.toFixed(2) : '******'}
               </div>
               <div className="text-green-400 text-sm">
                 {realBalance.sol.toFixed(4)} SOL
               </div>
             </div>
             
-            {/* Send/Receive Buttons */}
             <div className="grid grid-cols-2 gap-3 mb-6">
               <button
                 onClick={() => setShowSendModal(true)}
@@ -818,7 +781,6 @@ const VelocitySOL = () => {
               </div>
             </div>
             
-            {/* Trading History */}
             {tradingHistory.length > 0 && (
               <div className="mt-6">
                 <h3 className="text-lg font-bold text-white mb-3">Recent Trades</h3>
@@ -861,7 +823,6 @@ const VelocitySOL = () => {
             )}
           </div>
           
-          {/* Trading Signal */}
           <div className="lg:col-span-2">
             <div className="mb-6">
               <div className="flex items-center justify-between mb-4">
@@ -879,7 +840,6 @@ const VelocitySOL = () => {
               {renderSignalCard()}
             </div>
             
-            {/* Active Positions */}
             <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700">
               <h3 className="text-xl font-bold text-white mb-4">Active Positions</h3>
               {renderPositions()}
@@ -888,7 +848,6 @@ const VelocitySOL = () => {
         </div>
       </div>
       
-      {/* Modals */}
       <SendModal />
       <ReceiveModal />
     </div>
