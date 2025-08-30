@@ -93,7 +93,7 @@ const VelocitySOL = () => {
   
   const fetchLiveData = useCallback(async () => {
     try {
-      const priceResponse = await fetch(`${API_BASE}/price-hybrid`);
+      const priceResponse = await fetch(API_BASE + '/price-hybrid');
       const priceData = await priceResponse.json();
       
       if (priceData.success) {
@@ -101,14 +101,14 @@ const VelocitySOL = () => {
         setPriceChange24h(priceData.change24h || 0);
       }
       
-      const histResponse = await fetch(`${API_BASE}/historical-data?days=50`);
+      const histResponse = await fetch(API_BASE + '/historical-data?days=50');
       const histData = await histResponse.json();
       
       if (histData.success || histData.fallback) {
         setHistoricalData(histData.fallback || histData);
       }
       
-      const signalResponse = await fetch(`${API_BASE}/trading-signals`);
+      const signalResponse = await fetch(API_BASE + '/trading-signals');
       const signalData = await signalResponse.json();
       
       if (signalData.success || signalData.fallback) {
@@ -173,7 +173,7 @@ const VelocitySOL = () => {
       
       localStorage.setItem('velocitySOL_positions', JSON.stringify(updatedPositions));
       
-      alert(`Paper Trade Executed: ${tradingSignal.action} ${newPosition.size.toFixed(2)} SOL at ${tradingSignal.entry}`);
+      alert('Paper Trade Executed: ' + tradingSignal.action + ' ' + newPosition.size.toFixed(2) + ' SOL at ' + tradingSignal.entry);
       return;
     }
     
@@ -182,7 +182,7 @@ const VelocitySOL = () => {
       return;
     }
     
-    alert(`Live trading not yet implemented. Use paper trading mode.`);
+    alert('Live trading not yet implemented. Use paper trading mode.');
   };
   
   const closePosition = (positionId, partial = false) => {
@@ -222,7 +222,7 @@ const VelocitySOL = () => {
       setTradingHistory(updatedHistory);
       localStorage.setItem('velocitySOL_history', JSON.stringify(updatedHistory));
       
-      alert(`Partial close: 50% of position closed with ${partialPnL >= 0 ? 'profit' : 'loss'}: ${partialPnL.toFixed(2)}`);
+      alert('Partial close: 50% of position closed with ' + (partialPnL >= 0 ? 'profit' : 'loss') + ': ' + partialPnL.toFixed(2));
     } else {
       const updatedPositions = positions.filter(pos => pos.id !== positionId);
       setPositions(updatedPositions);
@@ -246,7 +246,7 @@ const VelocitySOL = () => {
       setTradingHistory(updatedHistory);
       localStorage.setItem('velocitySOL_history', JSON.stringify(updatedHistory));
       
-      alert(`Position closed with ${currentPnL >= 0 ? 'profit' : 'loss'}: ${currentPnL.toFixed(2)} (${pnlPercent.toFixed(1)}%)`);
+      alert('Position closed with ' + (currentPnL >= 0 ? 'profit' : 'loss') + ': ' + currentPnL.toFixed(2) + ' (' + pnlPercent.toFixed(1) + '%)');
     }
   };
   
@@ -336,10 +336,10 @@ const VelocitySOL = () => {
             <div>
               <label className="block text-gray-400 text-sm mb-2">Your Wallet Address</label>
               <div className="bg-gray-700 p-3 rounded border border-gray-600 break-all text-sm text-white">
-                {walletInfo?.address}
+                {walletInfo && walletInfo.address}
               </div>
               <button
-                onClick={() => navigator.clipboard.writeText(walletInfo?.address)}
+                onClick={() => navigator.clipboard.writeText(walletInfo && walletInfo.address)}
                 className="mt-2 text-blue-400 hover:text-blue-300 text-sm"
               >
                 Copy Address
@@ -373,7 +373,7 @@ const VelocitySOL = () => {
             </div>
           </div>
           <div className="text-right">
-            <div className={`text-2xl font-bold ${confidenceColor}`}>
+            <div className={'text-2xl font-bold ' + confidenceColor}>
               {tradingSignal.confidence}%
             </div>
             <div className="text-sm text-gray-400">Confidence</div>
@@ -404,19 +404,19 @@ const VelocitySOL = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="text-gray-400">RSI: </span>
-              <span className="text-white">{tradingSignal.technicals?.rsi || 'N/A'}</span>
+              <span className="text-white">{(tradingSignal.technicals && tradingSignal.technicals.rsi) || 'N/A'}</span>
             </div>
             <div>
               <span className="text-gray-400">MACD: </span>
-              <span className="text-white">{tradingSignal.technicals?.macd || 'N/A'}</span>
+              <span className="text-white">{(tradingSignal.technicals && tradingSignal.technicals.macd) || 'N/A'}</span>
             </div>
             <div>
               <span className="text-gray-400">SMA20: </span>
-              <span className="text-white">${tradingSignal.technicals?.sma20 || 'N/A'}</span>
+              <span className="text-white">${(tradingSignal.technicals && tradingSignal.technicals.sma20) || 'N/A'}</span>
             </div>
             <div>
               <span className="text-gray-400">Volatility: </span>
-              <span className="text-white">{((tradingSignal.technicals?.volatility || 0) * 100).toFixed(1)}%</span>
+              <span className="text-white">{(((tradingSignal.technicals && tradingSignal.technicals.volatility) || 0) * 100).toFixed(1)}%</span>
             </div>
           </div>
         </div>
@@ -459,15 +459,17 @@ const VelocitySOL = () => {
         <button
           onClick={executeTrade}
           disabled={isLoading || tradingSignal.confidence < 60}
-          className={`w-full mt-4 py-3 px-4 rounded-xl font-medium transition-all ${
-            tradingSignal.confidence > 80
-              ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-lg'
-              : tradingSignal.confidence > 60
-              ? 'bg-gradient-to-r from-yellow-600 to-yellow-700 text-white hover:shadow-lg'
-              : 'bg-gray-600 text-gray-300 cursor-not-allowed'
-          }`}
+          className={
+            'w-full mt-4 py-3 px-4 rounded-xl font-medium transition-all ' + (
+              tradingSignal.confidence > 80
+                ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:shadow-lg'
+                : tradingSignal.confidence > 60
+                ? 'bg-gradient-to-r from-yellow-600 to-yellow-700 text-white hover:shadow-lg'
+                : 'bg-gray-600 text-gray-300 cursor-not-allowed'
+            )
+          }
         >
-          {isLoading ? 'Executing...' : `Execute ${tradingSignal.action} Trade`}
+          {isLoading ? 'Executing...' : 'Execute ' + tradingSignal.action + ' Trade'}
           <span className="ml-2 text-xs">({tradingSignal.confidence}% confidence)</span>
         </button>
       </div>
@@ -497,9 +499,11 @@ const VelocitySOL = () => {
             <div key={position.id} className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    position.type.includes('BUY') ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
-                  }`}>
+                  <div className={
+                    'w-10 h-10 rounded-full flex items-center justify-center ' + (
+                      position.type.includes('BUY') ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
+                    )
+                  }>
                     {position.type.includes('BUY') ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
                   </div>
                   <div>
@@ -508,11 +512,11 @@ const VelocitySOL = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className={`font-bold text-lg ${currentPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <div className={'font-bold text-lg ' + (currentPnL >= 0 ? 'text-green-400' : 'text-red-400')}>
                     {currentPnL >= 0 ? '+' : ''}{currentPnL.toFixed(1)}%
                   </div>
-                  <div className={`text-sm ${pnlUSD >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    ${pnlUSD >= 0 ? '+' : ''}${pnlUSD.toFixed(2)}
+                  <div className={'text-sm ' + (pnlUSD >= 0 ? 'text-green-400' : 'text-red-400')}>
+                    ${pnlUSD >= 0 ? '+' : ''}{pnlUSD.toFixed(2)}
                   </div>
                 </div>
               </div>
@@ -567,19 +571,21 @@ const VelocitySOL = () => {
                       setTradingHistory(updatedHistory);
                       localStorage.setItem('velocitySOL_history', JSON.stringify(updatedHistory));
                       
-                      alert(`Profit secured: ${closePercent.toFixed(0)}% of position closed (+$${partialPnL.toFixed(2)})`);
+                      alert('Profit secured: ' + closePercent.toFixed(0) + '% of position closed (+$' + partialPnL.toFixed(2) + ')');
                     } else {
                       alert('Position is not in profit. Current P&L: ' + currentPnL.toFixed(1) + '%');
                     }
                   }}
                   disabled={currentPnL <= 0}
-                  className={`flex-1 py-2 px-3 rounded text-xs font-medium ${
-                    currentPnL > 0 
-                      ? 'bg-green-600 text-white hover:bg-green-700' 
-                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                  }`}
+                  className={
+                    'flex-1 py-2 px-3 rounded text-xs font-medium ' + (
+                      currentPnL > 0 
+                        ? 'bg-green-600 text-white hover:bg-green-700' 
+                        : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    )
+                  }
                 >
-                  Take Profit {currentPnL > 0 ? `(+${currentPnL.toFixed(1)}%)` : ''}
+                  Take Profit {currentPnL > 0 ? '(+' + currentPnL.toFixed(1) + '%)' : ''}
                 </button>
                 <button 
                   onClick={() => closePosition(position.id)}
@@ -636,11 +642,13 @@ const VelocitySOL = () => {
           <button
             onClick={connectWallet}
             disabled={connectionStatus === 'connecting'}
-            className={`w-full py-3 px-4 rounded-xl font-medium transition-all ${
-              connectionStatus === 'connecting'
-                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:shadow-lg'
-            }`}
+            className={
+              'w-full py-3 px-4 rounded-xl font-medium transition-all ' + (
+                connectionStatus === 'connecting'
+                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:shadow-lg'
+              )
+            }
           >
             {connectionStatus === 'connecting' ? 'Connecting...' : 'Connect Phantom Wallet'}
           </button>
@@ -675,7 +683,7 @@ const VelocitySOL = () => {
             <div className="flex items-center gap-4">
               <div className="text-right">
                 <div className="text-white font-medium">${currentPrice.toFixed(2)}</div>
-                <div className={`text-xs ${priceChange24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <div className={'text-xs ' + (priceChange24h >= 0 ? 'text-green-400' : 'text-red-400')}>
                   {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(1)}%
                 </div>
               </div>
@@ -698,7 +706,7 @@ const VelocitySOL = () => {
                 className="p-2 bg-gray-700/50 text-gray-400 hover:text-white rounded-lg transition-colors"
                 title="Refresh Data"
               >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={'w-4 h-4 ' + (isLoading ? 'animate-spin' : '')} />
               </button>
 
               <button
@@ -789,9 +797,11 @@ const VelocitySOL = () => {
                     <div key={trade.id} className="bg-gray-700/30 p-3 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                            trade.pnl >= 0 ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
-                          }`}>
+                          <div className={
+                            'w-6 h-6 rounded-full flex items-center justify-center ' + (
+                              trade.pnl >= 0 ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
+                            )
+                          }>
                             {trade.pnl >= 0 ? '+' : '-'}
                           </div>
                           <div>
@@ -804,14 +814,18 @@ const VelocitySOL = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className={`font-medium text-sm ${
-                            trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'
-                          }`}>
+                          <div className={
+                            'font-medium text-sm ' + (
+                              trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'
+                            )
+                          }>
                             {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
                           </div>
-                          <div className={`text-xs ${
-                            trade.pnlPercent >= 0 ? 'text-green-400' : 'text-red-400'
-                          }`}>
+                          <div className={
+                            'text-xs ' + (
+                              trade.pnlPercent >= 0 ? 'text-green-400' : 'text-red-400'
+                            )
+                          }>
                             {trade.pnlPercent >= 0 ? '+' : ''}{trade.pnlPercent.toFixed(1)}%
                           </div>
                         </div>
@@ -832,7 +846,7 @@ const VelocitySOL = () => {
                   disabled={isLoading}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
-                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={'w-4 h-4 ' + (isLoading ? 'animate-spin' : '')} />
                   Refresh
                 </button>
               </div>
